@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Custom Text Decoder</title>
+<meta name="description" content="A fast, offline-capable custom text decoder tool"/>
+<meta name="theme-color" content="#0d0d0f"/>
+<link rel="manifest" id="manifest-link"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --bg2: #141417;
+    --card: #1a1a1f;
+    --card2: #212128;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #f0f0f2;
+    --text2: #8a8a9a;
+    --text3: #5a5a6a;
+    --accent: #7c6aff;
+    --accent2: #a694ff;
+    --accent-glow: rgba(124,106,255,0.35);
+    --btn-text: #fff;
+    --success: #3dd68c;
+    --warning: #f5a623;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 8px 40px rgba(0,0,0,0.5);
+    --mono: 'DM Mono', monospace;
+    --display: 'Syne', sans-serif;
+  }
+
+  [data-theme="white"] {
+    --bg: #f5f5f7;
+    --bg2: #eaeaec;
+    --card: #ffffff;
+    --card2: #f0f0f4;
+    --border: rgba(0,0,0,0.07);
+    --border2: rgba(0,0,0,0.13);
+    --text: #0d0d0f;
+    --text2: #5a5a6a;
+    --text3: #9a9aaa;
+    --accent: #5c4fff;
+    --accent2: #7c6aff;
+    --accent-glow: rgba(92,79,255,0.2);
+    --btn-text: #fff;
+    --shadow: 0 8px 40px rgba(0,0,0,0.12);
+  }
+
+  [data-theme="silver-dark"] {
+    --bg: #1a1c20;
+    --bg2: #20232a;
+    --card: #272b34;
+    --card2: #2f3340;
+    --border: rgba(255,255,255,0.06);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8eaee;
+    --text2: #8090a0;
+    --text3: #4a5a6a;
+    --accent: #60b8d4;
+    --accent2: #88ccdd;
+    --accent-glow: rgba(96,184,212,0.3);
+    --btn-text: #fff;
+    --shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+
+  [data-theme="crimson"] {
+    --bg: #0f0508;
+    --bg2: #160a0d;
+    --card: #1e0d12;
+    --card2: #261218;
+    --border: rgba(255,80,80,0.1);
+    --border2: rgba(255,80,80,0.18);
+    --text: #f5e8ea;
+    --text2: #a07080;
+    --text3: #60404a;
+    --accent: #e0334a;
+    --accent2: #ff5566;
+    --accent-glow: rgba(224,51,74,0.4);
+    --btn-text: #fff;
+    --shadow: 0 8px 40px rgba(0,0,0,0.7);
+  }
+
+  [data-theme="gold"] {
+    --bg: #0d0b05;
+    --bg2: #14100a;
+    --card: #1c1710;
+    --card2: #231e16;
+    --border: rgba(200,160,40,0.12);
+    --border2: rgba(200,160,40,0.22);
+    --text: #f5ede0;
+    --text2: #9a8060;
+    --text3: #604a30;
+    --accent: #c8960a;
+    --accent2: #e0b030;
+    --accent-glow: rgba(200,150,10,0.4);
+    --btn-text: #0d0b05;
+    --shadow: 0 8px 40px rgba(0,0,0,0.7);
+  }
+
+  html, body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--display);
+    transition: background 0.35s ease, color 0.35s ease;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem 4rem;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 40% at 50% 0%, var(--accent-glow), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    transition: background 0.35s ease;
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: 640px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Header ─────────────────────────────────────── */
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--card);
+    border: 1px solid var(--border2);
+    border-radius: 99px;
+    padding: 5px 14px 5px 8px;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text2);
+    margin-bottom: 1.2rem;
+    letter-spacing: 0.05em;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; transform: scale(1); }
+    50%      { opacity:0.6; transform: scale(0.8); }
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+
+  h1 span {
+    color: var(--accent2);
+  }
+
+  .subtitle {
+    margin-top: 0.6rem;
+    font-size: 14px;
+    color: var(--text2);
+    font-family: var(--mono);
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Card ─────────────────────────────────────────── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.75rem;
+    box-shadow: var(--shadow);
+    transition: background 0.35s, border-color 0.35s;
+  }
+
+  .field-label {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  textarea, .output {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 14px 16px;
+    resize: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.35s;
+    outline: none;
+  }
+
+  textarea {
+    height: 130px;
+  }
+
+  textarea::placeholder { color: var(--text3); }
+
+  textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .output {
+    min-height: 100px;
+    color: var(--accent2);
+    white-space: pre-wrap;
+    word-break: break-all;
+    cursor: default;
+    position: relative;
+  }
+
+  .output.empty { color: var(--text3); font-style: italic; }
+
+  /* ── Divider ─────────────────────────────────────── */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.25rem 0;
+  }
+  .divider::before, .divider::after {
+    content:'';
+    flex:1;
+    height: 1px;
+    background: var(--border);
+  }
+  .divider-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--card2);
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  /* ── Buttons ─────────────────────────────────────── */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 1.25rem;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 13px 20px;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-family: var(--display);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::after {
+    content:'';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.06);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .btn:hover::after { opacity: 1; }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--btn-text);
+    box-shadow: 0 4px 20px var(--accent-glow);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 6px 28px var(--accent-glow);
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    background: var(--card2);
+    color: var(--text2);
+    border: 1px solid var(--border2);
+  }
+
+  .btn-secondary:hover { color: var(--text); }
+
+  .btn-secondary.copied {
+    color: var(--success);
+    border-color: rgba(61,214,140,0.35);
+  }
+
+  /* ── Warning ─────────────────────────────────────── */
+  .warning {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-top: 0.75rem;
+    padding: 10px 14px;
+    background: rgba(245,166,35,0.1);
+    border: 1px solid rgba(245,166,35,0.25);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--warning);
+    font-family: var(--mono);
+  }
+
+  .warning.show { display: flex; }
+
+  /* ── Map legend ─────────────────────────────────── */
+  .map-legend {
+    margin-top: 1.5rem;
+    padding: 1rem 1.25rem;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: background 0.35s;
+  }
+
+  .map-title {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+
+  .map-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 6px;
+  }
+
+  .map-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .map-from {
+    color: var(--text3);
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    min-width: 34px;
+    text-align: center;
+  }
+
+  .map-arrow { color: var(--text3); font-size: 10px; }
+  .map-to { color: var(--accent2); }
+
+  /* ── Settings panel ─────────────────────────────── */
+  .settings-btn {
+    position: fixed;
+    top: 18px; right: 18px;
+    z-index: 100;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 1px solid var(--border2);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    transition: transform 0.25s, box-shadow 0.25s;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+
+  .settings-btn:hover {
+    transform: rotate(60deg);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .settings-btn.open { transform: rotate(90deg); }
+
+  .panel {
+    position: fixed;
+    top: 68px; right: 18px;
+    z-index: 99;
+    background: var(--card);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    width: 210px;
+    box-shadow: var(--shadow);
+    transform-origin: top right;
+    transform: scale(0.9);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s;
+  }
+
+  .panel.open {
+    transform: scale(1);
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+
+  .theme-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text2);
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+  }
+
+  .theme-option:hover { background: var(--card2); color: var(--text); }
+
+  .theme-option.active {
+    background: var(--card2);
+    color: var(--accent2);
+  }
+
+  .theme-swatch {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.15);
+    flex-shrink: 0;
+  }
+
+  /* ── Install banner ─────────────────────────────── */
+  .install-banner {
+    display: none;
+    position: fixed;
+    bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    background: var(--card);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 12px 18px;
+    box-shadow: var(--shadow);
+    align-items: center;
+    gap: 14px;
+    max-width: 320px;
+    width: calc(100% - 40px);
+    animation: slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  .install-banner.show { display: flex; }
+
+  @keyframes slideUp {
+    from { transform: translateX(-50%) translateY(80px); opacity: 0; }
+    to   { transform: translateX(-50%) translateY(0); opacity: 1; }
+  }
+
+  .install-text { flex: 1; font-size: 13px; color: var(--text2); }
+  .install-text strong { color: var(--text); display: block; font-size: 14px; }
+
+  .install-btn-wrap { display: flex; gap: 8px; }
+
+  .btn-install {
+    padding: 8px 14px;
+    background: var(--accent);
+    color: var(--btn-text);
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: var(--display);
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-install:hover { opacity: 0.85; }
+
+  .btn-dismiss {
+    padding: 8px 10px;
+    background: transparent;
+    color: var(--text3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+
+  .btn-dismiss:hover { color: var(--text2); }
+
+  /* ── Footer ─────────────────────────────────────── */
+  footer {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text3);
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Responsive ─────────────────────────────────── */
+  @media (max-width: 480px) {
+    .card { padding: 1.25rem; }
+    .btn-row { flex-direction: column; }
+    h1 { font-size: 1.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Settings button -->
+<button class="settings-btn" id="settingsBtn" title="Settings" aria-label="Open settings">⚙️</button>
+
+<!-- Settings panel -->
+<div class="panel" id="settingsPanel" role="dialog" aria-label="Theme settings">
+  <p class="panel-title">Theme</p>
+  <div id="themeList">
+    <div class="theme-option active" data-theme="dark">
+      <span class="theme-swatch" style="background:#1a1a1f;"></span> Dark
+    </div>
+    <div class="theme-option" data-theme="white">
+      <span class="theme-swatch" style="background:#ffffff; border-color:#ddd;"></span> White
+    </div>
+    <div class="theme-option" data-theme="silver-dark">
+      <span class="theme-swatch" style="background:#272b34;"></span> Silver-dark
+    </div>
+    <div class="theme-option" data-theme="crimson">
+      <span class="theme-swatch" style="background:#1e0d12;"></span> Crimson
+    </div>
+    <div class="theme-option" data-theme="gold">
+      <span class="theme-swatch" style="background:#1c1710;"></span> Gold
+    </div>
+  </div>
+</div>
+
+<!-- Install banner -->
+<div class="install-banner" id="installBanner">
+  <div class="install-text">
+    <strong>Install Decoder</strong>
+    Add to home screen for offline use
+  </div>
+  <div class="install-btn-wrap">
+    <button class="btn-install" id="installBtn">Install</button>
+    <button class="btn-dismiss" id="dismissBtn">✕</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="logo-badge"><span class="logo-dot"></span> v1.0 · offline-ready</div>
+    <h1>Custom Text<br><span>Decoder</span></h1>
+    <p class="subtitle">// transform encoded strings instantly</p>
+  </header>
+
+  <div class="card">
+    <p class="field-label">Input — encoded text</p>
+    <textarea id="input" placeholder="Paste encoded text here…&#10;e.g. fh_12345 → wlanded cba" spellcheck="false" autocomplete="off"></textarea>
+
+    <div class="warning" id="warning">
+      <span>⚠</span> Input is empty — paste some encoded text first.
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="decodeBtn">↯ Decode</button>
+    </div>
+
+    <div class="divider">
+      <span class="divider-icon">↓</span>
+    </div>
+
+    <p class="field-label">Output — decoded text</p>
+    <div class="output empty" id="output" aria-live="polite">Result will appear here…</div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="copyBtn">Copy Result</button>
+      <button class="btn btn-secondary" id="clearBtn">Clear All</button>
+    </div>
+  </div>
+
+  <div class="map-legend">
+    <p class="map-title">Decode map</p>
+    <div class="map-grid" id="mapGrid"></div>
+  </div>
+</div>
+
+<footer>built with ♥ · works offline · pwa enabled</footer>
+
+<script>
+/* ── Decode map ───────────────────────────────────── */
+const DECODE_MAP = {
+  'fh_': 'wlan',
+  '0': 'f',
+  '1': 'e',
+  '2': 'd',
+  '3': 'c',
+  '4': 'b',
+  '5': 'a',
+  '6': '9',
+  '7': '8'
+};
+
+function decode(text) {
+  // Handle 'fh_' first, then single chars
+  let result = text.replace(/fh_/g, 'wlan');
+  result = result.replace(/[01234567]/g, ch => DECODE_MAP[ch] || ch);
+  return result;
+}
+
+/* ── Render decode map legend ─────────────────────── */
+(function renderMap() {
+  const grid = document.getElementById('mapGrid');
+  Object.entries(DECODE_MAP).forEach(([from, to]) => {
+    grid.innerHTML += `<div class="map-item">
+      <span class="map-from">${from}</span>
+      <span class="map-arrow">→</span>
+      <span class="map-to">${to}</span>
+    </div>`;
+  });
+})();
+
+/* ── DOM refs ─────────────────────────────────────── */
+const inputEl   = document.getElementById('input');
+const outputEl  = document.getElementById('output');
+const decodeBtn = document.getElementById('decodeBtn');
+const copyBtn   = document.getElementById('copyBtn');
+const clearBtn  = document.getElementById('clearBtn');
+const warning   = document.getElementById('warning');
+
+/* ── Decode action ───────────────────────────────── */
+decodeBtn.addEventListener('click', () => {
+  const raw = inputEl.value;
+  if (!raw.trim()) {
+    warning.classList.add('show');
+    inputEl.focus();
+    return;
+  }
+  warning.classList.remove('show');
+  const result = decode(raw);
+  outputEl.textContent = result;
+  outputEl.classList.remove('empty');
+  outputEl.style.animation = 'none';
+  requestAnimationFrame(() => {
+    outputEl.style.animation = 'fadeIn 0.3s ease';
+  });
+});
+
+inputEl.addEventListener('input', () => {
+  if (inputEl.value.trim()) warning.classList.remove('show');
+});
+
+/* ── Copy ────────────────────────────────────────── */
+copyBtn.addEventListener('click', async () => {
+  const text = outputEl.textContent;
+  if (!text || outputEl.classList.contains('empty')) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  copyBtn.textContent = '✓ Copied!';
+  copyBtn.classList.add('copied');
+  setTimeout(() => {
+    copyBtn.textContent = 'Copy Result';
+    copyBtn.classList.remove('copied');
+  }, 2000);
+});
+
+/* ── Clear ───────────────────────────────────────── */
+clearBtn.addEventListener('click', () => {
+  inputEl.value = '';
+  outputEl.textContent = 'Result will appear here…';
+  outputEl.classList.add('empty');
+  warning.classList.remove('show');
+  inputEl.focus();
+});
+
+/* ── Keyboard shortcut: Ctrl+Enter ──────────────── */
+inputEl.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') decodeBtn.click();
+});
+
+/* ── Fade in animation ───────────────────────────── */
+const style = document.createElement('style');
+style.textContent = `@keyframes fadeIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: translateY(0); } }`;
+document.head.appendChild(style);
+
+/* ── Theme system ────────────────────────────────── */
+const settingsBtn  = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+const themeOptions = document.querySelectorAll('.theme-option');
+
+function applyTheme(name) {
+  document.documentElement.setAttribute('data-theme', name === 'dark' ? '' : name);
+  themeOptions.forEach(o => o.classList.toggle('active', o.dataset.theme === name));
+  localStorage.setItem('decoder-theme', name);
+}
+
+const savedTheme = localStorage.getItem('decoder-theme') || 'dark';
+applyTheme(savedTheme);
+
+settingsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = settingsPanel.classList.toggle('open');
+  settingsBtn.classList.toggle('open', open);
+});
+
+document.addEventListener('click', (e) => {
+  if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+    settingsPanel.classList.remove('open');
+    settingsBtn.classList.remove('open');
+  }
+});
+
+themeOptions.forEach(opt => {
+  opt.addEventListener('click', () => {
+    applyTheme(opt.dataset.theme);
+  });
+});
+
+/* ── PWA: Manifest ───────────────────────────────── */
+const manifestData = {
+  name: 'Custom Text Decoder',
+  short_name: 'Decoder',
+  description: 'A fast offline-capable custom text decoder',
+  display: 'standalone',
+  orientation: 'portrait',
+  start_url: '.',
+  background_color: '#0d0d0f',
+  theme_color: '#7c6aff',
+  icons: [
+    {
+      src: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="#1a1a1f"/><text x="96" y="130" text-anchor="middle" font-size="100" font-family="serif" fill="#7c6aff">↯</text></svg>`),
+      sizes: '192x192',
+      type: 'image/svg+xml'
+    },
+    {
+      src: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#1a1a1f"/><text x="256" y="350" text-anchor="middle" font-size="280" font-family="serif" fill="#7c6aff">↯</text></svg>`),
+      sizes: '512x512',
+      type: 'image/svg+xml',
+      purpose: 'any maskable'
+    }
+  ]
+};
+
+const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/manifest+json' });
+document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
+
+/* ── PWA: Service Worker (inline blob) ──────────── */
+const SW_CODE = `
+const CACHE = 'decoder-v1';
+const ASSETS = ['/'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => {
+      // Cache what we can, ignore failures for blob URLs
+      return Promise.allSettled(ASSETS.map(a => c.add(a).catch(() => {})));
+    }).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', e => {
+  if (e.request.url.startsWith('blob:')) return;
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(resp => {
+        if (!resp || resp.status !== 200 || resp.type !== 'basic') return resp;
+        const clone = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return resp;
+      }).catch(() => caches.match('/'));
+    })
+  );
+});
+`;
+
+if ('serviceWorker' in navigator) {
+  const swBlob = new Blob([SW_CODE], { type: 'application/javascript' });
+  const swUrl  = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl, { scope: '/' })
+    .then(() => console.log('[SW] Registered'))
+    .catch(err => console.log('[SW] Registration failed:', err));
+}
+
+/* ── PWA: Install prompt ─────────────────────────── */
+let deferredPrompt;
+const installBanner = document.getElementById('installBanner');
+const installBtn    = document.getElementById('installBtn');
+const dismissBtn    = document.getElementById('dismissBtn');
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (!localStorage.getItem('install-dismissed')) {
+    installBanner.classList.add('show');
+  }
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBanner.classList.remove('show');
+});
+
+dismissBtn.addEventListener('click', () => {
+  installBanner.classList.remove('show');
+  localStorage.setItem('install-dismissed', '1');
+});
+</script>
+</body>
+</html>
